@@ -15,8 +15,12 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { spawn } from 'child_process';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
-const PROJECT_ROOT = path.join(__dirname, '../..');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// From scripts/mcp/dist/ we need to go up 3 levels to project root
+const PROJECT_ROOT = path.join(__dirname, '../../..');
 
 class GitMCPServer {
   private server: Server;
