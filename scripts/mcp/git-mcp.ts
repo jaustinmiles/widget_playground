@@ -196,6 +196,57 @@ class GitMCPServer {
               },
             },
           },
+          {
+            name: 'checkout',
+            description: 'Switch to a different branch',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                branch: {
+                  type: 'string',
+                  description: 'Branch name to switch to (e.g., "main" or "feature/xyz")',
+                },
+              },
+              required: ['branch'],
+            },
+          },
+          {
+            name: 'fetch',
+            description: 'Fetch latest changes from remote',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'pull',
+            description: 'Pull latest changes from remote for current branch',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'stash',
+            description: 'Stash uncommitted changes',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                message: {
+                  type: 'string',
+                  description: 'Optional stash message',
+                },
+              },
+            },
+          },
+          {
+            name: 'stash_pop',
+            description: 'Pop the most recent stash',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
         ] satisfies Tool[],
       };
     });
@@ -241,6 +292,21 @@ class GitMCPServer {
 
           case 'diff':
             return await this.getDiff(args?.staged as boolean | undefined);
+
+          case 'checkout':
+            return await this.checkout(args?.branch as string);
+
+          case 'fetch':
+            return await this.fetch();
+
+          case 'pull':
+            return await this.pull();
+
+          case 'stash':
+            return await this.stash(args?.message as string | undefined);
+
+          case 'stash_pop':
+            return await this.stashPop();
 
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -508,6 +574,74 @@ Generated with Claude Code`;
         {
           type: 'text',
           text: `**${label}**\n\n\`\`\`diff\n${output || 'No changes'}\n\`\`\``,
+        },
+      ],
+    };
+  }
+
+  private async checkout(branch: string) {
+    await this.runCommand('git', ['checkout', branch]);
+    const currentBranch = (await this.runCommand('git', ['branch', '--show-current'])).trim();
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Switched to branch:** ${currentBranch}`,
+        },
+      ],
+    };
+  }
+
+  private async fetch() {
+    await this.runCommand('git', ['fetch', 'origin']);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Fetched latest from origin**`,
+        },
+      ],
+    };
+  }
+
+  private async pull() {
+    const currentBranch = (await this.runCommand('git', ['branch', '--show-current'])).trim();
+    const output = await this.runCommand('git', ['pull', 'origin', currentBranch]);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Pulled latest for ${currentBranch}**\n\n\`\`\`\n${output || 'Already up to date'}\n\`\`\``,
+        },
+      ],
+    };
+  }
+
+  private async stash(message?: string) {
+    const args = message ? ['stash', 'push', '-m', message] : ['stash'];
+    await this.runCommand('git', args);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Stashed changes**${message ? `: ${message}` : ''}`,
+        },
+      ],
+    };
+  }
+
+  private async stashPop() {
+    const output = await this.runCommand('git', ['stash', 'pop']);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Popped stash**\n\n\`\`\`\n${output}\n\`\`\``,
         },
       ],
     };
