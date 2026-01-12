@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles for the app */
+:root {
+  --canvas-bg: #f8fafc;
+  --canvas-grid: #e2e8f0;
+  --widget-border: #cbd5e1;
+  --widget-border-hover: #3b82f6;
+  --widget-border-selected: #2563eb;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--canvas-bg);
+}
+
+/* Utility for widget containers */
+@layer components {
+  .widget-base {
+    @apply bg-white rounded-lg shadow-widget border border-widget-border;
+  }
+
+  .widget-base:hover {
+    @apply shadow-widget-hover border-widget-border-hover;
+  }
+
+  .panel-base {
+    @apply bg-white rounded-xl shadow-panel border border-gray-200;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors;
+  }
+}

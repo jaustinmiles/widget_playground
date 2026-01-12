@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+scripts/mcp/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/*.log
+*.log
+
+# Coverage
+coverage/
+
+# DuckDB
+data/*.duckdb
+data/*.duckdb.wal
+backups/
+
+# Misc
+*.tsbuildinfo

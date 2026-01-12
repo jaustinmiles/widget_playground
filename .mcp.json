@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "git": {
+      "command": "node",
+      "args": ["/Users/austinmiles/Documents/code/widget_playground/scripts/mcp/dist/git-mcp.js"]
+    }
+  }
+}
