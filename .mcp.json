@@ -3,6 +3,18 @@
     "git": {
       "command": "node",
       "args": ["/Users/austinmiles/Documents/code/widget_playground/scripts/mcp/dist/git-mcp.js"]
+    },
+    "database": {
+      "command": "node",
+      "args": ["/Users/austinmiles/Documents/code/widget_playground/scripts/mcp/dist/database-mcp.js"]
+    },
+    "logs": {
+      "command": "node",
+      "args": ["/Users/austinmiles/Documents/code/widget_playground/scripts/mcp/dist/logs-mcp.js"]
+    },
+    "app": {
+      "command": "node",
+      "args": ["/Users/austinmiles/Documents/code/widget_playground/scripts/mcp/dist/app-mcp.js"]
     }
   }
 }
