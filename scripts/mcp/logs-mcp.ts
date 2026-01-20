@@ -16,6 +16,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { MCPToolResponse, textResponse } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -200,7 +201,7 @@ class LogsMCPServer {
     return content.split('\n').filter(line => line.trim());
   }
 
-  private async tailLogs(lines: number = 50): Promise<{ content: { type: string; text: string }[] }> {
+  private async tailLogs(lines: number = 50): Promise<MCPToolResponse> {
     const allLines = this.readLogFile();
     const lastLines = allLines.slice(-lines);
 
@@ -228,7 +229,7 @@ class LogsMCPServer {
   private async searchLogs(
     pattern: string,
     context: number = 2
-  ): Promise<{ content: { type: string; text: string }[] }> {
+  ): Promise<MCPToolResponse> {
     const allLines = this.readLogFile();
     const regex = new RegExp(pattern, 'i');
     const matches: { lineNum: number; lines: string[] }[] = [];
@@ -279,7 +280,7 @@ class LogsMCPServer {
   private async filterByLevel(
     level: string,
     lines: number = 100
-  ): Promise<{ content: { type: string; text: string }[] }> {
+  ): Promise<MCPToolResponse> {
     const levelPriority: Record<string, number> = {
       debug: 0,
       info: 1,
@@ -320,7 +321,7 @@ class LogsMCPServer {
     };
   }
 
-  private async clearLogs(): Promise<{ content: { type: string; text: string }[] }> {
+  private async clearLogs(): Promise<MCPToolResponse> {
     this.ensureLogsDir();
 
     if (!fs.existsSync(LOG_FILE)) {
@@ -352,7 +353,7 @@ class LogsMCPServer {
     };
   }
 
-  private async listLogFiles(): Promise<{ content: { type: string; text: string }[] }> {
+  private async listLogFiles(): Promise<MCPToolResponse> {
     this.ensureLogsDir();
 
     const files = fs.readdirSync(LOGS_DIR)
@@ -394,7 +395,7 @@ class LogsMCPServer {
     level: string,
     message: string,
     context?: Record<string, unknown>
-  ): Promise<{ content: { type: string; text: string }[] }> {
+  ): Promise<MCPToolResponse> {
     this.ensureLogsDir();
 
     const timestamp = new Date().toISOString();
