@@ -5,7 +5,7 @@
  * Great for yoga sessions, meditation, or any timed activities.
  */
 
-import { BaseWidget, widget } from '../core/widget/index.js';
+import { BaseWidget, widgetRegistry } from '../core/widget/index.js';
 
 const TIMER_STYLES = `
   .timer {
@@ -116,7 +116,6 @@ const TIMER_STYLES = `
 type TimerMode = 'countdown' | 'stopwatch';
 type TimerState = 'idle' | 'running' | 'paused' | 'finished';
 
-@widget({ name: 'Timer', category: 'Utility', description: 'Countdown or stopwatch timer' })
 export class TimerWidget extends BaseWidget {
   static tag = 'timer-widget';
   static properties = {
@@ -275,3 +274,10 @@ export class TimerWidget extends BaseWidget {
     });
   }
 }
+
+// Register the widget
+widgetRegistry.register(TimerWidget, {
+  name: 'Timer',
+  category: 'Utility',
+  description: 'Countdown or stopwatch timer',
+});

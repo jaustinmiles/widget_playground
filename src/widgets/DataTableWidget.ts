@@ -5,7 +5,7 @@
  * Can be bound to CSV or other data providers.
  */
 
-import { BaseWidget, widget } from '../core/widget/index.js';
+import { BaseWidget, widgetRegistry } from '../core/widget/index.js';
 
 const TABLE_STYLES = `
   .data-table {
@@ -128,7 +128,6 @@ interface TableData {
   rows: TableRow[];
 }
 
-@widget({ name: 'Data Table', category: 'Display', description: 'Display tabular data with sorting' })
 export class DataTableWidget extends BaseWidget {
   static tag = 'data-table-widget';
   static properties = {
@@ -311,3 +310,10 @@ export class DataTableWidget extends BaseWidget {
     this.setProperty('data', csvData);
   }
 }
+
+// Register the widget
+widgetRegistry.register(DataTableWidget, {
+  name: 'Data Table',
+  category: 'Display',
+  description: 'Display tabular data with sorting',
+});
