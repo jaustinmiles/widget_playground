@@ -5,10 +5,8 @@
  * Widgets can be dragged from the palette onto the canvas.
  */
 
-import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { widgetRegistry } from '../core/widget/index.js';
 import { FloatingPanel } from './FloatingPanel.js';
-import type { DragData } from '../core/canvas/types.js';
 
 const PALETTE_STYLES = `
   .palette {
@@ -209,21 +207,21 @@ export class WidgetPalette extends HTMLElement {
       const tag = element.dataset.widgetTag;
       if (!tag) return;
 
-      const cleanup = draggable({
-        element,
-        getInitialData: (): DragData => ({
-          type: 'new-widget',
-          tag,
-        }),
-        onDragStart: () => {
-          element.classList.add('dragging');
-        },
-        onDrop: () => {
-          element.classList.remove('dragging');
-        },
+      // Use native HTML5 drag and drop which works across Shadow DOM
+      element.draggable = true;
+
+      element.addEventListener('dragstart', (e) => {
+        element.classList.add('dragging');
+        e.dataTransfer?.setData('application/widget-tag', tag);
+        e.dataTransfer?.setData('text/plain', tag);
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'copy';
+        }
       });
 
-      this.cleanupFns.push(cleanup);
+      element.addEventListener('dragend', () => {
+        element.classList.remove('dragging');
+      });
     });
   }
 

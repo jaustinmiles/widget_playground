@@ -5,11 +5,10 @@
  * Handles drop zones and coordinates with CanvasState.
  */
 
-import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { CanvasState } from './CanvasState.js';
 import { WidgetContainer } from './WidgetContainer.js';
 import { widgetRegistry } from '../widget/registry.js';
-import type { Position, CanvasConfig, DragData } from './types.js';
+import type { Position, CanvasConfig } from './types.js';
 
 const CANVAS_STYLES = `
   :host {
@@ -68,7 +67,6 @@ const CANVAS_STYLES = `
 export class Canvas extends HTMLElement {
   private state: CanvasState;
   private containers: Map<string, WidgetContainer> = new Map();
-  private cleanupDropTarget?: () => void;
 
   constructor(config?: Partial<CanvasConfig>) {
     super();
@@ -85,8 +83,8 @@ export class Canvas extends HTMLElement {
   }
 
   /** Add a widget to the canvas */
-  addWidget(tag: string, position?: Position, properties?: Record<string, unknown>): string {
-    const placement = this.state.addWidget(tag, position, undefined, properties);
+  addWidget(tag: string, position?: Position, properties?: Record<string, unknown>, size?: { width: number; height: number }): string {
+    const placement = this.state.addWidget(tag, position, size, properties);
     return placement.id;
   }
 
@@ -167,50 +165,50 @@ export class Canvas extends HTMLElement {
     });
   }
 
-  /** Setup drop target for new widgets */
+  /** Setup drop target for new widgets using native HTML5 drag and drop */
   private setupDropTarget(): void {
     const canvas = this.shadowRoot?.querySelector('.canvas');
     const inner = this.shadowRoot?.querySelector('.canvas-inner');
     if (!canvas || !inner) return;
 
-    this.cleanupDropTarget = dropTargetForElements({
-      element: inner as HTMLElement,
-      getData: () => ({ type: 'canvas' }),
-      canDrop: ({ source }) => {
-        const data = source.data as DragData;
-        return data.type === 'new-widget' || data.type === 'move-widget';
-      },
-      onDragEnter: () => {
-        canvas.classList.add('drag-over');
-      },
-      onDragLeave: () => {
-        canvas.classList.remove('drag-over');
-      },
-      onDrop: ({ source, location }) => {
-        canvas.classList.remove('drag-over');
-        const data = source.data as DragData & { startX?: number; startY?: number };
+    // Use native HTML5 drag and drop events on the host element
+    this.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+      }
+      canvas.classList.add('drag-over');
+    });
 
-        // Calculate drop position relative to canvas
-        const rect = inner.getBoundingClientRect();
-        const dropX = location.current.input.clientX - rect.left;
-        const dropY = location.current.input.clientY - rect.top;
+    this.addEventListener('dragleave', (e) => {
+      // Only remove class if leaving the canvas entirely
+      const rect = this.getBoundingClientRect();
+      if (
+        e.clientX <= rect.left ||
+        e.clientX >= rect.right ||
+        e.clientY <= rect.top ||
+        e.clientY >= rect.bottom
+      ) {
+        canvas.classList.remove('drag-over');
+      }
+    });
 
-        if (data.type === 'new-widget' && data.tag) {
-          // Add new widget at drop position
-          this.state.addWidget(data.tag, { x: dropX, y: dropY });
-        } else if (data.type === 'move-widget' && data.widgetId) {
-          // Move existing widget
-          const dx = dropX - (data.startX || 0);
-          const dy = dropY - (data.startY || 0);
-          const widget = this.state.getWidget(data.widgetId);
-          if (widget) {
-            this.state.moveWidget(data.widgetId, {
-              x: widget.position.x + dx,
-              y: widget.position.y + dy,
-            });
-          }
-        }
-      },
+    this.addEventListener('drop', (e) => {
+      e.preventDefault();
+      canvas.classList.remove('drag-over');
+
+      const tag = e.dataTransfer?.getData('application/widget-tag');
+      if (!tag) return;
+
+      // Calculate drop position relative to canvas inner
+      const rect = inner.getBoundingClientRect();
+      const scrollLeft = (canvas as HTMLElement).scrollLeft || 0;
+      const scrollTop = (canvas as HTMLElement).scrollTop || 0;
+      const dropX = e.clientX - rect.left + scrollLeft;
+      const dropY = e.clientY - rect.top + scrollTop;
+
+      // Add new widget at drop position
+      this.state.addWidget(tag, { x: dropX, y: dropY });
     });
   }
 
@@ -329,9 +327,7 @@ export class Canvas extends HTMLElement {
 
   /** Cleanup on disconnect */
   disconnectedCallback(): void {
-    if (this.cleanupDropTarget) {
-      this.cleanupDropTarget();
-    }
+    // Event listeners are automatically cleaned up when element is removed
   }
 }
 
