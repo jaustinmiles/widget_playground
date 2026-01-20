@@ -512,16 +512,69 @@ Generated with Claude Code`;
   }
 
   private async getPRReviews(prNumber: number) {
-    const output = await this.runCommand('gh', [
-      'pr', 'view', prNumber.toString(),
-      '--json', 'reviews,comments',
+    // Get PR review comments (inline code comments)
+    const reviewCommentsJson = await this.runCommand('gh', [
+      'api',
+      `/repos/{owner}/{repo}/pulls/${prNumber}/comments`,
     ]);
+
+    // Get PR reviews (top-level review submissions)
+    const reviewsJson = await this.runCommand('gh', [
+      'api',
+      `/repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+    ]);
+
+    const reviewComments = JSON.parse(reviewCommentsJson || '[]');
+    const reviews = JSON.parse(reviewsJson || '[]');
+
+    let output = `**PR #${prNumber} Reviews**\n\n`;
+
+    // Format top-level reviews
+    if (reviews.length > 0) {
+      output += `## Reviews\n\n`;
+      for (const review of reviews) {
+        const state = review.state || 'PENDING';
+        const user = review.user?.login || 'Unknown';
+        const body = review.body || '(No comment)';
+        const submittedAt = review.submitted_at ? new Date(review.submitted_at).toLocaleString() : '';
+
+        output += `### ${state} by @${user}${submittedAt ? ` (${submittedAt})` : ''}\n`;
+        if (body && body.trim()) {
+          output += `${body}\n`;
+        }
+        output += `\n`;
+      }
+    }
+
+    // Format inline code comments
+    if (reviewComments.length > 0) {
+      output += `## Inline Comments\n\n`;
+      for (const comment of reviewComments) {
+        const user = comment.user?.login || 'Unknown';
+        const file = comment.path || 'Unknown file';
+        const line = comment.line || comment.original_line || '?';
+        const body = comment.body || '';
+        const id = comment.id;
+        const diffHunk = comment.diff_hunk || '';
+
+        output += `### ${file}:${line} (Comment ID: ${id})\n`;
+        output += `**@${user}:** ${body}\n`;
+        if (diffHunk) {
+          output += `\`\`\`diff\n${diffHunk}\n\`\`\`\n`;
+        }
+        output += `\n`;
+      }
+    }
+
+    if (reviews.length === 0 && reviewComments.length === 0) {
+      output += `No reviews or comments found.`;
+    }
 
     return {
       content: [
         {
           type: 'text',
-          text: `**PR #${prNumber} Reviews**\n\n\`\`\`json\n${output}\n\`\`\``,
+          text: output,
         },
       ],
     };
