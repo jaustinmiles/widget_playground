@@ -11,6 +11,7 @@ type WidgetClass = typeof BaseWidget & {
   tag: string;
   properties: PropertySchema;
   styles?: string;
+  widgetMeta?: WidgetMetadata;
 };
 
 interface RegisteredWidget {
@@ -61,6 +62,9 @@ class WidgetRegistry {
       category: metadata?.category || 'General',
       properties: ctor.properties,
     };
+
+    // Set widgetMeta on the constructor for easy access
+    (ctor as WidgetClass).widgetMeta = fullMetadata;
 
     // Register the custom element
     if (!customElements.get(tag)) {
