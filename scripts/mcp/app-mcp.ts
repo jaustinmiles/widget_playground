@@ -17,6 +17,7 @@ import { spawn, ChildProcess, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { MCPToolResponse, textResponse } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -205,7 +206,7 @@ class AppMCPServer {
     return { running: false };
   }
 
-  private async startServer(port: number = 5173): Promise<{ content: { type: string; text: string }[] }> {
+  private async startServer(port: number = 5173): Promise<MCPToolResponse> {
     const status = this.isServerRunning();
     if (status.running) {
       return {
@@ -265,7 +266,7 @@ class AppMCPServer {
     });
   }
 
-  private async stopServer(): Promise<{ content: { type: string; text: string }[] }> {
+  private async stopServer(): Promise<MCPToolResponse> {
     const status = this.isServerRunning();
     if (!status.running) {
       return {
@@ -303,7 +304,7 @@ class AppMCPServer {
     }
   }
 
-  private async getStatus(): Promise<{ content: { type: string; text: string }[] }> {
+  private async getStatus(): Promise<MCPToolResponse> {
     const status = this.isServerRunning();
 
     if (status.running) {
@@ -327,14 +328,14 @@ class AppMCPServer {
     };
   }
 
-  private async restartServer(port?: number): Promise<{ content: { type: string; text: string }[] }> {
+  private async restartServer(port?: number): Promise<MCPToolResponse> {
     await this.stopServer();
     // Small delay to ensure port is released
     await new Promise(resolve => setTimeout(resolve, 500));
     return this.startServer(port);
   }
 
-  private async runBuild(): Promise<{ content: { type: string; text: string }[] }> {
+  private async runBuild(): Promise<MCPToolResponse> {
     return new Promise((resolve) => {
       try {
         const output = execSync('npm run build', {
@@ -365,7 +366,7 @@ class AppMCPServer {
     });
   }
 
-  private async runPreview(port: number = 4173): Promise<{ content: { type: string; text: string }[] }> {
+  private async runPreview(port: number = 4173): Promise<MCPToolResponse> {
     return new Promise((resolve) => {
       const preview = spawn('npm', ['run', 'preview', '--', '--port', String(port)], {
         cwd: PROJECT_ROOT,
@@ -411,7 +412,7 @@ class AppMCPServer {
   private async runTests(
     watch: boolean = false,
     filter?: string
-  ): Promise<{ content: { type: string; text: string }[] }> {
+  ): Promise<MCPToolResponse> {
     return new Promise((resolve) => {
       const args = ['run', 'test'];
       if (!watch) {
@@ -450,7 +451,7 @@ class AppMCPServer {
     });
   }
 
-  private async runLint(fix: boolean = false): Promise<{ content: { type: string; text: string }[] }> {
+  private async runLint(fix: boolean = false): Promise<MCPToolResponse> {
     return new Promise((resolve) => {
       const args = ['run', 'lint'];
       if (fix) {

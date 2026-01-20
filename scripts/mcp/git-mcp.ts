@@ -247,6 +247,44 @@ class GitMCPServer {
               properties: {},
             },
           },
+          {
+            name: 'sync_with_remote',
+            description: 'Force sync local branch with its remote counterpart (fetch + reset --hard)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                branch: {
+                  type: 'string',
+                  description: 'Branch to sync (default: current branch)',
+                },
+              },
+            },
+          },
+          {
+            name: 'force_push',
+            description: 'Force push current branch to remote (use after rebase)',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'rebase',
+            description: 'Rebase current branch onto another branch',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                onto: {
+                  type: 'string',
+                  description: 'Branch to rebase onto',
+                },
+                abort: {
+                  type: 'boolean',
+                  description: 'Abort an in-progress rebase',
+                },
+              },
+            },
+          },
         ] satisfies Tool[],
       };
     });
@@ -307,6 +345,18 @@ class GitMCPServer {
 
           case 'stash_pop':
             return await this.stashPop();
+
+          case 'sync_with_remote':
+            return await this.syncWithRemote(args?.branch as string | undefined);
+
+          case 'force_push':
+            return await this.forcePush();
+
+          case 'rebase':
+            return await this.rebase(
+              args?.onto as string | undefined,
+              args?.abort as boolean | undefined
+            );
 
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -512,16 +562,69 @@ Generated with Claude Code`;
   }
 
   private async getPRReviews(prNumber: number) {
-    const output = await this.runCommand('gh', [
-      'pr', 'view', prNumber.toString(),
-      '--json', 'reviews,comments',
+    // Get PR review comments (inline code comments)
+    const reviewCommentsJson = await this.runCommand('gh', [
+      'api',
+      `/repos/{owner}/{repo}/pulls/${prNumber}/comments`,
     ]);
+
+    // Get PR reviews (top-level review submissions)
+    const reviewsJson = await this.runCommand('gh', [
+      'api',
+      `/repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+    ]);
+
+    const reviewComments = JSON.parse(reviewCommentsJson || '[]');
+    const reviews = JSON.parse(reviewsJson || '[]');
+
+    let output = `**PR #${prNumber} Reviews**\n\n`;
+
+    // Format top-level reviews
+    if (reviews.length > 0) {
+      output += `## Reviews\n\n`;
+      for (const review of reviews) {
+        const state = review.state || 'PENDING';
+        const user = review.user?.login || 'Unknown';
+        const body = review.body || '(No comment)';
+        const submittedAt = review.submitted_at ? new Date(review.submitted_at).toLocaleString() : '';
+
+        output += `### ${state} by @${user}${submittedAt ? ` (${submittedAt})` : ''}\n`;
+        if (body && body.trim()) {
+          output += `${body}\n`;
+        }
+        output += `\n`;
+      }
+    }
+
+    // Format inline code comments
+    if (reviewComments.length > 0) {
+      output += `## Inline Comments\n\n`;
+      for (const comment of reviewComments) {
+        const user = comment.user?.login || 'Unknown';
+        const file = comment.path || 'Unknown file';
+        const line = comment.line || comment.original_line || '?';
+        const body = comment.body || '';
+        const id = comment.id;
+        const diffHunk = comment.diff_hunk || '';
+
+        output += `### ${file}:${line} (Comment ID: ${id})\n`;
+        output += `**@${user}:** ${body}\n`;
+        if (diffHunk) {
+          output += `\`\`\`diff\n${diffHunk}\n\`\`\`\n`;
+        }
+        output += `\n`;
+      }
+    }
+
+    if (reviews.length === 0 && reviewComments.length === 0) {
+      output += `No reviews or comments found.`;
+    }
 
     return {
       content: [
         {
           type: 'text',
-          text: `**PR #${prNumber} Reviews**\n\n\`\`\`json\n${output}\n\`\`\``,
+          text: output,
         },
       ],
     };
@@ -645,6 +748,110 @@ Generated with Claude Code`;
         },
       ],
     };
+  }
+
+  private async syncWithRemote(branch?: string) {
+    const targetBranch = branch || (await this.runCommand('git', ['branch', '--show-current'])).trim();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const backupBranch = `backup/${targetBranch}-${timestamp}`;
+
+    // Create backup branch before destructive operation
+    try {
+      await this.runCommand('git', ['branch', backupBranch]);
+    } catch {
+      // Backup branch creation failed, but continue
+    }
+
+    // Stash any uncommitted changes
+    let hadStash = false;
+    try {
+      const status = await this.runCommand('git', ['status', '--porcelain']);
+      if (status.trim()) {
+        await this.runCommand('git', ['stash', 'push', '-m', `Auto-stash before sync: ${timestamp}`]);
+        hadStash = true;
+      }
+    } catch {
+      // No changes to stash
+    }
+
+    await this.runCommand('git', ['fetch', 'origin', targetBranch]);
+    await this.runCommand('git', ['reset', '--hard', `origin/${targetBranch}`]);
+    const log = await this.runCommand('git', ['log', '--oneline', '-5']);
+
+    let message = `✅ **Synced ${targetBranch} with origin/${targetBranch}**\n\n`;
+    message += `📦 **Backup branch:** \`${backupBranch}\`\n`;
+    if (hadStash) {
+      message += `📦 **Changes stashed** (use \`git stash pop\` to restore)\n`;
+    }
+    message += `\n**Recent commits:**\n\`\`\`\n${log}\n\`\`\``;
+
+    return {
+      content: [{ type: 'text', text: message }],
+    };
+  }
+
+  private async forcePush() {
+    const currentBranch = (await this.runCommand('git', ['branch', '--show-current'])).trim();
+    if (['main', 'master'].includes(currentBranch)) {
+      throw new Error(`Cannot force push to protected branch "${currentBranch}"`);
+    }
+
+    // Create a local backup tag before force pushing
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const backupTag = `backup/pre-force-push-${currentBranch}-${timestamp}`;
+    try {
+      await this.runCommand('git', ['tag', backupTag]);
+    } catch {
+      // Tag creation failed, but continue
+    }
+
+    await this.runCommand('git', ['push', '--force-with-lease', 'origin', currentBranch]);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Force pushed ${currentBranch} to origin**\n\n📦 **Backup tag:** \`${backupTag}\` (local only)`,
+        },
+      ],
+    };
+  }
+
+  private async rebase(onto?: string, abort?: boolean) {
+    const currentBranch = (await this.runCommand('git', ['branch', '--show-current'])).trim();
+
+    if (abort) {
+      await this.runCommand('git', ['rebase', '--abort']);
+      return {
+        content: [{ type: 'text', text: `✅ **Rebase aborted** on ${currentBranch}` }],
+      };
+    }
+
+    if (!onto) {
+      throw new Error('Must specify "onto" branch for rebase, or use "abort: true"');
+    }
+
+    try {
+      await this.runCommand('git', ['rebase', onto]);
+      const log = await this.runCommand('git', ['log', '--oneline', '-5']);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ **Rebased ${currentBranch} onto ${onto}**\n\n**Recent commits:**\n\`\`\`\n${log}\n\`\`\``,
+          },
+        ],
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('CONFLICT')) {
+        return {
+          content: [{ type: 'text', text: `⚠️ **Rebase conflict**\n\nResolve conflicts then use rebase with abort: true to cancel.\n\n${msg}` }],
+          isError: true,
+        };
+      }
+      throw error;
+    }
   }
 
   private async runCommand(

@@ -17,6 +17,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import Database from 'duckdb';
+import { MCPToolResponse, textResponse } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -248,7 +249,7 @@ class DatabaseMCPServer {
     });
   }
 
-  private runQuery(sql: string): Promise<{ content: { type: string; text: string }[] }> {
+  private runQuery(sql: string): Promise<MCPToolResponse> {
     return new Promise((resolve, reject) => {
       const db = this.getDB();
 
@@ -281,7 +282,7 @@ class DatabaseMCPServer {
     });
   }
 
-  private async runExecute(sql: string): Promise<{ content: { type: string; text: string }[] }> {
+  private async runExecute(sql: string): Promise<MCPToolResponse> {
     // Auto-backup before write operations
     await this.createBackup('auto-backup');
 
@@ -306,7 +307,7 @@ class DatabaseMCPServer {
     });
   }
 
-  private async getSchema(table?: string): Promise<{ content: { type: string; text: string }[] }> {
+  private async getSchema(table?: string): Promise<MCPToolResponse> {
     const db = this.getDB();
 
     if (table) {
@@ -352,7 +353,7 @@ class DatabaseMCPServer {
     }
   }
 
-  private async createBackup(name?: string): Promise<{ content: { type: string; text: string }[] }> {
+  private async createBackup(name?: string): Promise<MCPToolResponse> {
     // Ensure backup directory exists
     if (!fs.existsSync(BACKUP_DIR)) {
       fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -377,7 +378,7 @@ class DatabaseMCPServer {
     };
   }
 
-  private async listBackups(): Promise<{ content: { type: string; text: string }[] }> {
+  private async listBackups(): Promise<MCPToolResponse> {
     if (!fs.existsSync(BACKUP_DIR)) {
       return {
         content: [
@@ -411,7 +412,7 @@ class DatabaseMCPServer {
     };
   }
 
-  private async restoreBackup(backupFile: string): Promise<{ content: { type: string; text: string }[] }> {
+  private async restoreBackup(backupFile: string): Promise<MCPToolResponse> {
     const backupPath = path.join(BACKUP_DIR, backupFile);
 
     if (!fs.existsSync(backupPath)) {
@@ -443,7 +444,7 @@ class DatabaseMCPServer {
     };
   }
 
-  private async exportCSV(sql: string, filename?: string): Promise<{ content: { type: string; text: string }[] }> {
+  private async exportCSV(sql: string, filename?: string): Promise<MCPToolResponse> {
     return new Promise((resolve, reject) => {
       const db = this.getDB();
 
