@@ -2,10 +2,8 @@
  * Widget Container
  *
  * Wraps widgets on the canvas with drag and resize functionality.
- * Uses @atlaskit/pragmatic-drag-and-drop for drag operations.
  */
 
-import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { Position, Size, WidgetPlacement } from './types.js';
 
 export interface WidgetContainerCallbacks {
@@ -146,7 +144,6 @@ const CONTAINER_STYLES = `
 export class WidgetContainer extends HTMLElement {
   private placement: WidgetPlacement;
   private callbacks: WidgetContainerCallbacks;
-  private cleanupDrag?: () => void;
   private isResizing = false;
   private resizeStartPos?: Position;
   private resizeStartSize?: Size;
@@ -246,23 +243,41 @@ export class WidgetContainer extends HTMLElement {
   /** Set up drag and drop */
   private setupDragAndDrop(): void {
     const container = this.shadowRoot?.querySelector('.container');
-    if (!container) return;
+    const dragHandle = this.shadowRoot?.querySelector('.drag-handle') as HTMLElement;
+    if (!container || !dragHandle) return;
 
-    this.cleanupDrag = draggable({
-      element: this,
-      dragHandle: container.querySelector('.drag-handle') as HTMLElement,
-      getInitialData: () => ({
-        type: 'move-widget',
-        widgetId: this.placement.id,
-        startX: this.placement.position.x,
-        startY: this.placement.position.y,
-      }),
-      onDragStart: () => {
-        container.classList.add('dragging');
-      },
-      onDrop: () => {
+    // Manual drag handling since pragmatic-drag-and-drop doesn't work well with Shadow DOM handles
+    let isDragging = false;
+
+    dragHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isDragging = true;
+      container.classList.add('dragging');
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startPosX = this.placement.position.x;
+      const startPosY = this.placement.position.y;
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        if (!isDragging) return;
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        this.callbacks.onMove(this.placement.id, {
+          x: startPosX + dx,
+          y: startPosY + dy,
+        });
+      };
+
+      const onMouseUp = () => {
+        isDragging = false;
         container.classList.remove('dragging');
-      },
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     });
   }
 
@@ -320,9 +335,7 @@ export class WidgetContainer extends HTMLElement {
 
   /** Cleanup on disconnect */
   disconnectedCallback(): void {
-    if (this.cleanupDrag) {
-      this.cleanupDrag();
-    }
+    // Cleanup handled by removing event listeners (automatic when element is removed)
   }
 }
 
